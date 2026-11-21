@@ -108,6 +108,10 @@
     <string name="settings_language_title">App language</string>
     <string name="language_system">System default</string>
     <string name="language_english">English</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_portuguese">Português</string>
+    <string name="language_french">Français</string>
+    <string name="language_german">Deutsch</string>
     <string name="language_russian">Русский</string>
 
     <!-- Security -->

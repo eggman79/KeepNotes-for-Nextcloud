@@ -17,6 +17,14 @@ class AppLanguageTest {
     fun `fromCode returns matching language case-insensitively`() {
         assertEquals(AppLanguage.ENGLISH, AppLanguage.fromCode("en"))
         assertEquals(AppLanguage.ENGLISH, AppLanguage.fromCode("EN"))
+        assertEquals(AppLanguage.SPANISH, AppLanguage.fromCode("es"))
+        assertEquals(AppLanguage.SPANISH, AppLanguage.fromCode("ES"))
+        assertEquals(AppLanguage.PORTUGUESE, AppLanguage.fromCode("pt"))
+        assertEquals(AppLanguage.PORTUGUESE, AppLanguage.fromCode("PT"))
+        assertEquals(AppLanguage.FRENCH, AppLanguage.fromCode("fr"))
+        assertEquals(AppLanguage.FRENCH, AppLanguage.fromCode("FR"))
+        assertEquals(AppLanguage.GERMAN, AppLanguage.fromCode("de"))
+        assertEquals(AppLanguage.GERMAN, AppLanguage.fromCode("DE"))
         assertEquals(AppLanguage.RUSSIAN, AppLanguage.fromCode("ru"))
         assertEquals(AppLanguage.RUSSIAN, AppLanguage.fromCode("RU"))
     }

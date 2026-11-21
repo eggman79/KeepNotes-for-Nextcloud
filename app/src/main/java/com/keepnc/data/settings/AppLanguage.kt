@@ -22,6 +22,10 @@ enum class AppLanguage(
 ) {
     SYSTEM("", R.string.language_system),
     ENGLISH("en", R.string.language_english),
+    SPANISH("es", R.string.language_spanish),
+    PORTUGUESE("pt", R.string.language_portuguese),
+    FRENCH("fr", R.string.language_french),
+    GERMAN("de", R.string.language_german),
     RUSSIAN("ru", R.string.language_russian);
 
     companion object {

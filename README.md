@@ -39,7 +39,7 @@
   - **Размеры шрифтов**: независимый выбор размера шрифта для карточек и редактора (Маленький, Обычный, Крупный, Очень крупный).
   - **Управление подтверждениями**: включение/отключение диалогов подтверждения сохранения при выходе и удаления заметок.
 - **Мультиязычность**:
-  - Встроенный выбор языка (русский / английский) прямо в настройках приложения (Per-App Language).
+  - Встроенный выбор языка (русский, английский, испанский, португальский, французский, немецкий) прямо в настройках приложения (Per-App Language).
 - **Приватность**:
   - 100% открытый исходный код без Google Play Services, рекламы, телеметрии и аналитики.
 
@@ -114,7 +114,7 @@ Built strictly without proprietary blobs or tracking libraries, free from Google
   - **Font Size Presets**: Configurable font sizes for cards and editor (Small, Medium, Large, Extra Large).
   - **Confirmation Dialogs**: Toggleable save-on-exit and note deletion confirmations.
 - **In-App Language Selection**:
-  - Change application language (English / Russian) directly from the settings screen.
+  - Change application language (English, Spanish, Portuguese, French, German, Russian) directly from the settings screen.
 - **Privacy First**:
   - 100% Free & Open Source software with zero tracking, zero analytics, zero ads, and no Google Play Services dependencies.
 
@@ -190,7 +190,7 @@ Desarrollado sin bibliotecas propietarias ni rastreadores, no utiliza Google Pla
   - **Ajustes de tamaño de fuente**: tamaños de fuente independientes para tarjetas y editor (Pequeño, Mediano, Grande, Extra grande).
   - **Diálogos de confirmación**: activación/desactivación de advertencias al guardar al salir y al eliminar notas.
 - **Selección de idioma en la aplicación**:
-  - Cambio de idioma de la aplicación (inglés / ruso) directamente desde los ajustes.
+  - Cambio de idioma de la aplicación (español, inglés, portugués, francés, alemán, ruso) directamente desde los ajustes.
 - **Privacidad ante todo**:
   - 100% software libre y de código abierto, sin rastreo, sin telemetría, sin anuncios y sin dependencias de Google Play Services.
 
@@ -266,7 +266,7 @@ Desenvolvido sem bibliotecas proprietárias nem rastreadores, não utiliza o Goo
   - **Ajuste do tamanho de letra**: definições independentes de tamanho de fonte para os cartões e o editor (Pequeno, Médio, Grande, Extra grande).
   - **Caixas de diálogo de confirmação**: ativação/desativação de confirmações ao guardar ao sair e ao eliminar notas.
 - **Seleção de idioma na aplicação**:
-  - Altere o idioma da aplicação (inglês / russo) diretamente nas definições.
+  - Altere o idioma da aplicação (português, inglês, espanhol, francês, alemão, russo) diretamente nas definições.
 - **Privacidade em primeiro lugar**:
   - 100% software livre e de código aberto, sem rastreamento, sem telemetria, sem anúncios e sem dependências do Google Play Services.
 
@@ -342,7 +342,7 @@ Développée sans bibliothèques propriétaires ni traqueurs, l'application n'ut
   - **Tailles de police personnalisables** : choix indépendant de la taille de police pour les cartes et l'éditeur (Petit, Moyen, Grand, Très grand).
   - **Boîtes de dialogue de confirmation** : activation/désactivation de la confirmation d'enregistrement en quittant et de la suppression de notes.
 - **Choix de la langue dans l'application** :
-  - Changement de la langue de l'application (anglais / russe) directement dans les paramètres.
+  - Changement de la langue de l'application (français, anglais, espagnol, portugais, allemand, russe) directement dans les paramètres.
 - **Respect absolu de la vie privée** :
   - 100 % logiciel libre et open source, sans aucun traqueur, sans analytique, sans publicité et sans dépendance aux services Google Play.
 
@@ -418,7 +418,7 @@ Entwickelt ohne proprietäre Bibliotheken oder Tracker, kommt die App vollständ
   - **Schriftgrößen-Voreinstellungen**: Unabhängig voneinander anpassbare Schriftgrößen für Karten und Editor (Klein, Mittel, Groß, Sehr groß).
   - **Bestätigungsdialoge**: Ein-/Ausschalten von Abfragen beim Speichern beim Verlassen und beim Löschen von Notizen.
 - **In-App-Sprachauswahl**:
-  - Wechseln der App-Sprache (Englisch / Russisch) direkt in den App-Einstellungen.
+  - Wechseln der App-Sprache (Deutsch, Englisch, Spanisch, Portugiesisch, Französisch, Russisch) direkt in den App-Einstellungen.
 - **Datenschutz an erster Stelle**:
   - 100 % freie und Open-Source-Software ohne Tracking, ohne Analysedienste, werbefrei und ohne Abhängigkeiten von Google Play Services.
 

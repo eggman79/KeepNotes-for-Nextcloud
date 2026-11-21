@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App & Auth -->
+    <string name="app_name">KeepNotes</string>
+    <string name="app_full_name">KeepNotes for Nextcloud</string>
+    <string name="login_title">KeepNotes for Nextcloud</string>
+    <string name="login_subtitle">Cliente de Nextcloud Notes</string>
+    <string name="login_server_url_hint">https://su.servidor.nextcloud</string>
+    <string name="login_button">Iniciar sesión con Nextcloud</string>
+    <string name="login_waiting">Esperando autorización en el navegador…</string>
+    <string name="login_error_empty_url">Por favor, introduzca la URL de su servidor</string>
+    <string name="login_error_invalid_url">Introduzca una URL válida que empiece por https://</string>
+    <string name="login_error_timeout">Se agotó el tiempo de espera. Inténtelo de nuevo.</string>
+    <string name="login_error_save_credentials">Error al guardar las credenciales en el dispositivo de forma segura</string>
+    <string name="login_check_now">Comprobar autorización</string>
+    <string name="login_reopen_browser">Abrir navegador de nuevo</string>
+
+    <!-- Notes List & Drawer -->
+    <string name="notes_all">Todas las notas</string>
+    <string name="notes_favorites">Favoritas</string>
+    <string name="notes_empty">Aún no hay notas.\nToca + para crear una.</string>
+    <string name="notes_empty_search">No se encontraron notas.</string>
+    <string name="notes_empty_category">No hay notas en esta categoría.</string>
+    <string name="notes_empty_favorites">No hay notas destacadas.</string>
+    <string name="notes_search_hint">Buscar notas…</string>
+    <string name="notes_categories">Categorías</string>
+
+    <!-- Editor -->
+    <string name="editor_title_label">Título de la nota</string>
+    <string name="editor_title_hint">Título</string>
+    <string name="editor_content_hint">Nota…</string>
+    <string name="editor_category_hint">Categoría</string>
+    <string name="editor_add_category">+ Categoría</string>
+    <string name="editor_preview">Vista previa</string>
+    <string name="editor_edit">Editar</string>
+    <string name="editor_favorite">Favorita</string>
+    <string name="editor_note_not_found">Nota no encontrada</string>
+    <string name="editor_draft_restored">Borrador no guardado restaurado</string>
+
+    <!-- Category Picker -->
+    <string name="category_picker_title">Categoría de la nota</string>
+    <string name="category_picker_new_hint">Crear categoría…</string>
+    <string name="category_picker_create">Crear \"%1$s\"</string>
+    <string name="category_none">Sin categoría</string>
+
+    <!-- Actions -->
+    <string name="action_logout">Cerrar sesión</string>
+    <string name="action_delete">Eliminar</string>
+    <string name="action_sync">Sincronizar</string>
+    <string name="action_save">Guardar</string>
+    <string name="action_discard">Descartar</string>
+    <string name="confirm">Eliminar</string>
+    <string name="cancel">Cancelar</string>
+
+    <!-- Dialogs -->
+    <string name="delete_note_title">¿Eliminar nota?</string>
+    <string name="delete_note_message">Esta nota se eliminará permanentemente.</string>
+
+    <string name="save_changes_title">¿Guardar cambios?</string>
+    <string name="save_changes_message">Tienes cambios sin guardar en esta nota.</string>
+
+    <string name="logout_title">¿Cerrar sesión?</string>
+    <string name="logout_message">Se cerrará la sesión de tu cuenta de Nextcloud. Las notas locales no sincronizadas se perderán.</string>
+
+    <!-- Sync & Status -->
+    <string name="sync_started">Sincronizando…</string>
+    <string name="sync_success">Sincronización completada</string>
+    <string name="sync_error">Error de sincronización. Comprueba la conexión.</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Algo salió mal. Por favor, inténtalo de nuevo.</string>
+    <string name="error_network">Sin conexión a Internet</string>
+
+    <!-- Editor Bottom Actions -->
+    <string name="editor_toggle_checkboxes">Casillas</string>
+    <string name="editor_more_actions">Más opciones</string>
+    <string name="editor_action_show_checkboxes">Crear lista</string>
+    <string name="editor_action_hide_checkboxes">Texto plano</string>
+    <string name="editor_action_category">Categoría</string>
+    <string name="editor_action_delete_note">Eliminar nota</string>
+
+    <!-- Accessibility -->
+    <string name="cd_new_note">Crear nota</string>
+    <string name="cd_pinned">Fijada</string>
+    <string name="cd_unsynced">Cambios no sincronizados</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_section_notes">Notas y editor</string>
+    <string name="settings_confirm_save_title">Confirmar al guardar</string>
+    <string name="settings_confirm_save_desc">Preguntar si se guardan los cambios al salir del editor. Si se desactiva, los cambios se guardan automáticamente.</string>
+    <string name="settings_confirm_delete_title">Confirmar al eliminar</string>
+    <string name="settings_confirm_delete_desc">Pedir confirmación antes de eliminar una nota.</string>
+    <!-- Appearance -->
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_theme_title">Tema de la aplicación</string>
+    <string name="theme_system">Predeterminado del sistema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="settings_editor_font_size_title">Tamaño de fuente del editor</string>
+    <string name="settings_card_font_size_title">Tamaño de fuente de las tarjetas</string>
+    <string name="font_size_small">Pequeño</string>
+    <string name="font_size_medium">Normal</string>
+    <string name="font_size_large">Grande</string>
+    <string name="font_size_extra_large">Muy grande</string>
+
+    <!-- Language -->
+    <string name="settings_language_title">Idioma de la aplicación</string>
+    <string name="language_system">Predeterminado del sistema</string>
+    <string name="language_english">English</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_portuguese">Português</string>
+    <string name="language_french">Français</string>
+    <string name="language_german">Deutsch</string>
+    <string name="language_russian">Русский</string>
+
+    <!-- Security -->
+    <string name="settings_section_security">Seguridad</string>
+    <string name="settings_app_lock_title">Bloqueo de la aplicación</string>
+    <string name="settings_app_lock_desc">Solicitar huella, reconocimiento facial o PIN al abrir la aplicación</string>
+    <string name="auth_prompt_title">Desbloquear KeepNotes</string>
+    <string name="auth_prompt_subtitle">Confirma tu identidad para continuar</string>
+    <string name="auth_enable_prompt_title">Activar bloqueo</string>
+    <string name="auth_disable_prompt_title">Desactivar bloqueo</string>
+    <string name="auth_error_no_credentials">Configura primero un bloqueo de pantalla (PIN, patrón o huella) en los ajustes del dispositivo.</string>
+    <string name="app_locked_subtitle">La aplicación está bloqueada</string>
+    <string name="action_unlock">Desbloquear</string>
+    <string name="cd_app_locked">Aplicación bloqueada</string>
+
+    <string name="settings_section_about">Acerca de</string>
+    <string name="settings_app_version">Versión %1$s</string>
+    <string name="settings_server_url">Servidor conectado</string>
+</resources>
