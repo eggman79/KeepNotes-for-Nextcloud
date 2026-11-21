@@ -1,0 +1,4 @@
+- Fixed checkbox touch accuracy and offset drift in note preview mode.
+- Fixed interaction with nested/child checklists in preview mode.
+- Added auto-save and draft protection to prevent data loss when backgrounding or switching modes.
+- Improved link click handling inside checklist items.
