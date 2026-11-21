@@ -35,6 +35,7 @@
     <string name="editor_edit">Редактировать</string>
     <string name="editor_favorite">Избранное</string>
     <string name="editor_note_not_found">Заметка не найдена</string>
+    <string name="editor_draft_restored">Восстановлен несохраненный черновик</string>
 
     <!-- Category Picker -->
     <string name="category_picker_title">Категория заметки</string>

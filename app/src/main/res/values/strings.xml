@@ -35,6 +35,7 @@
     <string name="editor_edit">Edit</string>
     <string name="editor_favorite">Favorite</string>
     <string name="editor_note_not_found">Note not found</string>
+    <string name="editor_draft_restored">Restored unsaved draft</string>
 
     <!-- Category Picker -->
     <string name="category_picker_title">Note category</string>

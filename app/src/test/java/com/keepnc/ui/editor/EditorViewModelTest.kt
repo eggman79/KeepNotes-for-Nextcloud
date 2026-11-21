@@ -1,7 +1,9 @@
 package com.keepnc.ui.editor
 
 import com.keepnc.data.auth.TokenStorage
+import com.keepnc.data.local.DraftStorage
 import com.keepnc.data.local.NoteDao
+import com.keepnc.data.local.NoteDraft
 import com.keepnc.data.local.NoteEntity
 import com.keepnc.data.local.SyncStatus
 import com.keepnc.data.remote.NotesApi
@@ -32,6 +34,7 @@ class EditorViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeDao: FakeNoteDao
     private lateinit var fakeApi: FakeNotesApi
+    private lateinit var fakeDraftStorage: FakeDraftStorage
     private lateinit var repository: NotesRepository
     private lateinit var viewModel: EditorViewModel
 
@@ -40,6 +43,7 @@ class EditorViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeDao = FakeNoteDao()
         fakeApi = FakeNotesApi()
+        fakeDraftStorage = FakeDraftStorage()
 
         val unsafeClass = Class.forName("sun.misc.Unsafe")
         val unsafeField = unsafeClass.getDeclaredField("theUnsafe")
@@ -51,7 +55,7 @@ class EditorViewModelTest {
         repository = NotesRepository(fakeDao, fakeApi, dummyTokenStorage).apply {
             ioDispatcher = testDispatcher
         }
-        viewModel = EditorViewModel(repository)
+        viewModel = EditorViewModel(repository, fakeDraftStorage)
     }
 
     @After
@@ -223,6 +227,183 @@ class EditorViewModelTest {
         val note = NoteEntity(title = "My Note", content = noteContent)
 
         assertEquals("- [ ] Task 1\n- [ ] Task 2", note.excerpt)
+    }
+
+    @Test
+    fun `when draft exists for note, draft content is restored and hasRestoredDraft is true`() = runTest {
+        val note = NoteEntity(
+            id = 5L,
+            serverId = 105L,
+            title = "Original Title",
+            content = "Original Content",
+            syncStatus = SyncStatus.SYNCED
+        )
+        fakeDao.notes[5L] = note
+        fakeDraftStorage.saveDraft(
+            5L,
+            NoteDraft(
+                title = "Draft Title",
+                content = "Draft Content (Unsaved)",
+                category = "Work",
+                isFavorite = true
+            )
+        )
+
+        viewModel.loadNote(5L)
+        advanceUntilIdle()
+
+        assertEquals("Draft Title", viewModel.title.value)
+        assertEquals("Draft Content (Unsaved)", viewModel.content.value)
+        assertEquals("Work", viewModel.category.value)
+        assertTrue(viewModel.isFavorite.value)
+        assertTrue(viewModel.hasRestoredDraft.value)
+
+        // hasChanges should be true because current fields differ from Room note
+        assertTrue(
+            viewModel.hasChanges(
+                currentTitle = "Draft Title",
+                currentContent = "Draft Content (Unsaved)",
+                currentCategory = "Work",
+                currentFavorite = true
+            )
+        )
+    }
+
+    @Test
+    fun `discardDraft reverts fields back to initial Room state and clears draft`() = runTest {
+        val note = NoteEntity(
+            id = 5L,
+            title = "Original Title",
+            content = "Original Content"
+        )
+        fakeDao.notes[5L] = note
+        fakeDraftStorage.saveDraft(
+            5L,
+            NoteDraft(
+                title = "Draft Title",
+                content = "Draft Content",
+                category = "",
+                isFavorite = false
+            )
+        )
+
+        viewModel.loadNote(5L)
+        advanceUntilIdle()
+
+        viewModel.discardDraft()
+
+        assertEquals("Original Title", viewModel.title.value)
+        assertEquals("Original Content", viewModel.content.value)
+        assertFalse(viewModel.hasRestoredDraft.value)
+        assertFalse(fakeDraftStorage.hasDraft(5L))
+    }
+
+    @Test
+    fun `autoSave saves note immediately to Room and clears draft without navigating`() = runTest {
+        val note = NoteEntity(
+            id = 5L,
+            title = "Original Title",
+            content = "Original Content"
+        )
+        fakeDao.notes[5L] = note
+        fakeDraftStorage.saveDraft(
+            5L,
+            NoteDraft(
+                title = "AutoSave Title",
+                content = "AutoSave Content",
+                category = "Ideas",
+                isFavorite = true
+            )
+        )
+
+        viewModel.loadNote(5L)
+        advanceUntilIdle()
+
+        viewModel.autoSave(
+            titleText = "AutoSave Title",
+            contentText = "AutoSave Content",
+            categoryText = "Ideas",
+            favorite = true
+        )
+        advanceUntilIdle()
+
+        val updatedNote = fakeDao.notes[5L]!!
+        assertEquals("AutoSave Title", updatedNote.title)
+        assertEquals("AutoSave Content", updatedNote.content)
+        assertEquals("Ideas", updatedNote.category)
+        assertTrue(updatedNote.favorite)
+
+        // Draft should be cleared
+        assertFalse(fakeDraftStorage.hasDraft(5L))
+        // uiState should remain Editing (NOT Saved, which would pop backstack)
+        assertEquals(EditorUiState.Editing, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `saveNote clears draft and transitions to Saved state`() = runTest {
+        val note = NoteEntity(id = 5L, title = "Title", content = "Content")
+        fakeDao.notes[5L] = note
+        fakeDraftStorage.saveDraft(
+            5L,
+            NoteDraft(title = "Draft", content = "Draft", category = "", isFavorite = false)
+        )
+
+        viewModel.loadNote(5L)
+        advanceUntilIdle()
+
+        viewModel.saveNote(
+            titleText = "Saved Title",
+            contentText = "Saved Content",
+            categoryText = "",
+            favorite = false
+        )
+        advanceUntilIdle()
+
+        assertFalse(fakeDraftStorage.hasDraft(5L))
+        assertEquals(EditorUiState.Saved, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `deleteNote clears draft and transitions to Saved state`() = runTest {
+        val note = NoteEntity(id = 5L, title = "Title", content = "Content")
+        fakeDao.notes[5L] = note
+        fakeDraftStorage.saveDraft(
+            5L,
+            NoteDraft(title = "Draft", content = "Draft", category = "", isFavorite = false)
+        )
+
+        viewModel.loadNote(5L)
+        advanceUntilIdle()
+
+        viewModel.deleteNote()
+        advanceUntilIdle()
+
+        assertFalse(fakeDraftStorage.hasDraft(5L))
+        assertEquals(EditorUiState.Saved, viewModel.uiState.value)
+    }
+
+    private class FakeDraftStorage : DraftStorage(null) {
+        val drafts = mutableMapOf<String, NoteDraft>()
+
+        override fun saveDraft(noteId: Long?, draft: NoteDraft) {
+            val key = if (noteId == null || noteId == -1L) "draft_new_note" else "draft_$noteId"
+            drafts[key] = draft
+        }
+
+        override fun getDraft(noteId: Long?): NoteDraft? {
+            val key = if (noteId == null || noteId == -1L) "draft_new_note" else "draft_$noteId"
+            return drafts[key]
+        }
+
+        override fun clearDraft(noteId: Long?) {
+            val key = if (noteId == null || noteId == -1L) "draft_new_note" else "draft_$noteId"
+            drafts.remove(key)
+        }
+
+        override fun hasDraft(noteId: Long?): Boolean {
+            val key = if (noteId == null || noteId == -1L) "draft_new_note" else "draft_$noteId"
+            return drafts.containsKey(key)
+        }
     }
 
     private class FakeNoteDao : NoteDao {

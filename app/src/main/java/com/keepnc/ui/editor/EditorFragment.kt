@@ -6,6 +6,7 @@ import android.text.Editable
 import android.text.Selection
 import android.text.Spannable
 import android.text.Spanned
+import android.text.style.ClickableSpan
 import android.text.style.LeadingMarginSpan
 import android.util.TypedValue
 import android.view.LayoutInflater
@@ -33,6 +34,7 @@ import com.keepnc.data.settings.SettingsStorage
 import com.keepnc.databinding.FragmentEditorBinding
 import com.keepnc.ui.MarkwonFactory
 import dagger.hilt.android.AndroidEntryPoint
+import io.noties.markwon.ext.tasklist.TaskListSpan
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -101,6 +103,7 @@ class EditorFragment : Fragment() {
         observeUiState()
         observeCategory()
         observeFavorite()
+        observeDraftRestored()
         observeFieldsOnce()
         setupBackHandler()
         applyFontSize()
@@ -170,6 +173,27 @@ class EditorFragment : Fragment() {
                         if (isFav) R.drawable.ic_star_filled
                         else R.drawable.ic_star_outline
                     )
+                }
+            }
+        }
+    }
+
+    private fun observeDraftRestored() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.hasRestoredDraft.collect { restored ->
+                    if (restored) {
+                        Snackbar.make(binding.root, R.string.editor_draft_restored, Snackbar.LENGTH_LONG)
+                            .setAction(R.string.action_discard) {
+                                viewModel.discardDraft()
+                                binding.etTitle.setText(viewModel.title.value)
+                                binding.etContent.setText(viewModel.content.value)
+                                if (isPreviewMode) {
+                                    applyMode(true)
+                                }
+                            }
+                            .show()
+                    }
                 }
             }
         }
@@ -308,7 +332,23 @@ class EditorFragment : Fragment() {
     // =========================================================================
 
     private fun togglePreviewMode() {
-        applyMode(!isPreviewMode)
+        val nextMode = !isPreviewMode
+        if (nextMode) {
+            val currentTitle = binding.etTitle.text?.toString() ?: ""
+            val rawContent = binding.etContent.text?.toString() ?: ""
+            val currentContent = cleanEmptyTaskLines(rawContent)
+            val currentCategory = viewModel.category.value
+            val currentFavorite = viewModel.isFavorite.value
+
+            if (viewModel.hasChanges(currentTitle, currentContent, currentCategory, currentFavorite)) {
+                if (!settingsStorage.isConfirmSaveOnExit()) {
+                    viewModel.autoSave(currentTitle, currentContent, currentCategory, currentFavorite)
+                } else {
+                    viewModel.saveDraft(currentTitle, currentContent, currentCategory, currentFavorite)
+                }
+            }
+        }
+        applyMode(nextMode)
     }
 
     private fun applyMode(preview: Boolean) {
@@ -387,7 +427,6 @@ class EditorFragment : Fragment() {
                     val deltaY = Math.abs(event.y - touchDownY)
                     if (deltaX < touchSlop && deltaY < touchSlop) {
                         handleCheckboxTouch(event.x, event.y)
-                        true
                     } else {
                         false
                     }
@@ -397,53 +436,60 @@ class EditorFragment : Fragment() {
         }
     }
 
-    private fun handleCheckboxTouch(touchX: Float, touchY: Float) {
-        val layout = binding.tvPreview.layout ?: return
-        val y = (touchY - binding.tvPreview.totalPaddingTop).coerceAtLeast(0f)
+    private fun handleCheckboxTouch(touchX: Float, touchY: Float): Boolean {
+        val layout = binding.tvPreview.layout ?: return false
+        val totalPaddingTop = binding.tvPreview.totalPaddingTop
+        val totalPaddingBottom = binding.tvPreview.totalPaddingBottom
+        val viewHeight = binding.tvPreview.height
+
+        if (touchY < totalPaddingTop || touchY > viewHeight - totalPaddingBottom) {
+            return false
+        }
+
+        val y = touchY - totalPaddingTop
+        if (y < 0f || y >= layout.height) return false
+
         val line = layout.getLineForVertical(y.toInt())
-        if (line < 0 || line >= layout.lineCount) return
+        if (line < 0 || line >= layout.lineCount) return false
 
         val lineStart = layout.getLineStart(line)
         val lineEnd = layout.getLineEnd(line)
 
         val text = binding.tvPreview.text
-        val spannable = text as? Spanned ?: return
+        val spannable = text as? Spanned ?: return false
 
-        // Method 1: Check LeadingMarginSpan which Markwon attaches to list items
-        val marginSpans = spannable.getSpans(lineStart, lineEnd, LeadingMarginSpan::class.java)
-        if (marginSpans.isNotEmpty()) {
-            val allSpans = spannable.getSpans(0, spannable.length, LeadingMarginSpan::class.java)
-                .sortedBy { spannable.getSpanStart(it) }
-            val tappedSpan = marginSpans.first()
-            val tappedIndex = allSpans.indexOf(tappedSpan)
-            if (tappedIndex != -1) {
-                toggleTaskAtIndex(tappedIndex)
-                return
+        // Check if the user tapped on a link (ClickableSpan/URLSpan) so links remain clickable
+        val offset = layout.getOffsetForHorizontal(line, touchX)
+        if (offset in lineStart until lineEnd) {
+            val clickableSpans = spannable.getSpans(offset, offset + 1, ClickableSpan::class.java)
+            if (clickableSpans.isNotEmpty()) {
+                return false
             }
         }
 
-        // Method 2: Match line text against raw task list items
-        val rawContent = binding.etContent.text?.toString() ?: return
-        val lineText = text.subSequence(lineStart, lineEnd).toString().trim()
-        if (lineText.isBlank()) return
+        // Look specifically for TaskListSpan (attached exclusively to task list items by Markwon TaskListPlugin)
+        val taskSpans = spannable.getSpans(lineStart, lineEnd, TaskListSpan::class.java)
+        if (taskSpans.isEmpty()) return false
 
-        val taskRegex = Regex("""^(\s*-\s*\[[ xX]\]\s*)(.*)$""", RegexOption.MULTILINE)
-        val taskMatches = taskRegex.findAll(rawContent).toList()
+        // For nested/child checklists, Markwon's parent list span covers the child's text range as well.
+        // The child span starts at or after lineStart, whereas the parent span started on an earlier line.
+        // Selecting the span with maximum spanStart correctly targets the innermost (child) item.
+        val tappedSpan = taskSpans.maxByOrNull { spannable.getSpanStart(it) } ?: return false
 
-        val foundIndex = taskMatches.indexOfFirst { match ->
-            val taskBody = match.groupValues[2].trim().removePrefix("~~").removeSuffix("~~").trim()
-            val cleanLine = lineText.removePrefix("~~").removeSuffix("~~").trim()
-            taskBody.isNotEmpty() && (cleanLine.contains(taskBody) || taskBody.contains(cleanLine))
+        // All TaskListSpans in document order (guaranteed 1:1 match with markdown task list items)
+        val allTaskSpans = spannable.getSpans(0, spannable.length, TaskListSpan::class.java)
+            .sortedBy { spannable.getSpanStart(it) }
+        val tappedIndex = allTaskSpans.indexOf(tappedSpan)
+        if (tappedIndex != -1) {
+            toggleTaskAtIndex(tappedIndex)
+            return true
         }
-
-        if (foundIndex != -1) {
-            toggleTaskAtIndex(foundIndex)
-        }
+        return false
     }
 
     private fun toggleTaskAtIndex(targetIndex: Int) {
         val fullContent = binding.etContent.text?.toString() ?: return
-        val taskRegex = Regex("""^(\s*[-*]\s*\[)([ xX])(\]\s*)(.*)$""", RegexOption.MULTILINE)
+        val taskRegex = Regex("""^(\s*[-*+]\s*\[)([ xX])(\]\s*)(.*)$""", RegexOption.MULTILINE)
         var count = 0
 
         val newContent = taskRegex.replace(fullContent) { matchResult ->
@@ -454,23 +500,24 @@ class EditorFragment : Fragment() {
                 val suffix = matchResult.groupValues[3]
                 val body = matchResult.groupValues[4]
                 val isCurrentlyChecked = current.trim().isNotEmpty()
+                val trimmed = body.trim()
 
                 if (isCurrentlyChecked) {
                     // Was checked [x] -> uncheck to [ ] and remove ~~strikethrough~~ if present
-                    val cleanBody = if (body.startsWith("~~") && body.endsWith("~~") && body.length >= 4) {
-                        body.substring(2, body.length - 2)
+                    val cleanBody = if (trimmed.startsWith("~~") && trimmed.endsWith("~~") && trimmed.length >= 4) {
+                        trimmed.substring(2, trimmed.length - 2).trim()
                     } else {
                         body
                     }
                     "${prefix} $suffix$cleanBody"
                 } else {
                     // Was unchecked [ ] -> check to [x] and add ~~strikethrough~~
-                    val strikeBody = if (body.startsWith("~~") && body.endsWith("~~") && body.length >= 4) {
-                        body
+                    val cleanBody = if (trimmed.startsWith("~~") && trimmed.endsWith("~~") && trimmed.length >= 4) {
+                        trimmed.substring(2, trimmed.length - 2).trim()
                     } else {
-                        "~~$body~~"
+                        body.trim()
                     }
-                    "${prefix}x$suffix$strikeBody"
+                    "${prefix}x$suffix~~$cleanBody~~"
                 }
             } else {
                 count++
@@ -479,6 +526,16 @@ class EditorFragment : Fragment() {
         }
 
         binding.etContent.setText(newContent)
+
+        val currentTitle = binding.etTitle.text?.toString() ?: ""
+        val currentCategory = viewModel.category.value
+        val currentFavorite = viewModel.isFavorite.value
+
+        if (!settingsStorage.isConfirmSaveOnExit()) {
+            viewModel.autoSave(currentTitle, newContent, currentCategory, currentFavorite)
+        } else {
+            viewModel.saveDraft(currentTitle, newContent, currentCategory, currentFavorite)
+        }
 
         val title = binding.etTitle.text?.toString()?.trim() ?: ""
         val contentToRender = if (title.isNotBlank()) {
@@ -653,8 +710,13 @@ class EditorFragment : Fragment() {
                     if (state is EditorUiState.Editing && !fieldsPopulated) {
                         fieldsPopulated = true
 
-                        binding.etTitle.setText(viewModel.title.value)
-                        binding.etContent.setText(viewModel.content.value)
+                        val currentTitle = binding.etTitle.text?.toString()
+                        val currentContent = binding.etContent.text?.toString()
+
+                        if (currentTitle.isNullOrEmpty() && currentContent.isNullOrEmpty()) {
+                            binding.etTitle.setText(viewModel.title.value)
+                            binding.etContent.setText(viewModel.content.value)
+                        }
 
                         setupTitleInToolbar()
                         applyMode(isPreviewMode)
@@ -700,6 +762,7 @@ class EditorFragment : Fragment() {
                         )
                     }
                     .setNegativeButton(R.string.action_discard) { _, _ ->
+                        viewModel.discardDraft()
                         findNavController().popBackStack()
                     }
                     .setNeutralButton(R.string.cancel, null)
@@ -738,9 +801,28 @@ class EditorFragment : Fragment() {
         imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
     }
 
+    override fun onPause() {
+        super.onPause()
+        val currentTitle = binding.etTitle.text?.toString() ?: ""
+        val rawContent = binding.etContent.text?.toString() ?: ""
+        val currentContent = cleanEmptyTaskLines(rawContent)
+        val currentCategory = viewModel.category.value
+        val currentFavorite = viewModel.isFavorite.value
+
+        if (viewModel.hasChanges(currentTitle, currentContent, currentCategory, currentFavorite)) {
+            if (!settingsStorage.isConfirmSaveOnExit()) {
+                viewModel.autoSave(currentTitle, currentContent, currentCategory, currentFavorite)
+            } else {
+                viewModel.saveDraft(currentTitle, currentContent, currentCategory, currentFavorite)
+            }
+        }
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(KEY_PREVIEW_MODE, isPreviewMode)
+        outState.putString(KEY_SAVED_TITLE, binding.etTitle.text?.toString())
+        outState.putString(KEY_SAVED_CONTENT, binding.etContent.text?.toString())
     }
 
     override fun onDestroyView() {
@@ -750,5 +832,7 @@ class EditorFragment : Fragment() {
 
     companion object {
         private const val KEY_PREVIEW_MODE = "preview_mode"
+        private const val KEY_SAVED_TITLE = "saved_title"
+        private const val KEY_SAVED_CONTENT = "saved_content"
     }
 }
