@@ -1,0 +1,3 @@
+- Añadida localización completa de la aplicación en español, portugués, francés y alemán.
+- Añadido selector de idioma para los nuevos idiomas en los ajustes.
+- Añadida documentación multilingüe y metadatos de la tienda.

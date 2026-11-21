@@ -1,0 +1,3 @@
+- Added full app localization in Spanish, Portuguese, French, and German.
+- Added in-app language switcher options for new languages.
+- Added comprehensive multilingual documentation and store metadata.

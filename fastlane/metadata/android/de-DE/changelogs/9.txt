@@ -1,0 +1,3 @@
+- Vollständige App-Lokalisierung auf Deutsch, Spanisch, Portugiesisch und Französisch hinzugefügt.
+- Sprachauswahl für neue Sprachen in den Einstellungen hinzugefügt.
+- Mehrsprachige Dokumentation und Store-Metadaten hinzugefügt.
