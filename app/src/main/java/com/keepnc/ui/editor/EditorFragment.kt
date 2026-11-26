@@ -69,6 +69,9 @@ class EditorFragment : Fragment() {
     @Inject
     lateinit var settingsStorage: SettingsStorage
 
+    @Inject
+    lateinit var tokenStorage: com.keepnc.data.auth.TokenStorage
+
     private var fieldsPopulated = false
     private var isPreviewMode = false
 
@@ -410,7 +413,16 @@ class EditorFragment : Fragment() {
         val formattedContent = MarkwonFactory.formatChecklistStrikethrough(content)
         val fontSize = settingsStorage.getEditorFontSize()
 
-        val markwon = MarkwonFactory.createForEditor(requireContext(), fontSize.editorCheckboxDp)
+        val serverUrl = tokenStorage.getServerUrl()
+        val noteServerId = viewModel.serverId
+
+        val markwon = MarkwonFactory.createForEditor(
+            context = requireContext(),
+            checkboxSizeDp = fontSize.editorCheckboxDp,
+            urlResolver = { rawPath ->
+                com.keepnc.data.remote.AttachmentUrlUtils.resolveAttachmentUrl(serverUrl, noteServerId, rawPath)
+            }
+        )
         markwon.setMarkdown(binding.tvPreview, formattedContent)
 
         val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop

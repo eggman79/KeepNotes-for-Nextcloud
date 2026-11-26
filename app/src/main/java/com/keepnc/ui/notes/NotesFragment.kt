@@ -51,6 +51,9 @@ class NotesFragment : Fragment() {
     @Inject
     lateinit var settingsStorage: SettingsStorage
 
+    @Inject
+    lateinit var tokenStorage: com.keepnc.data.auth.TokenStorage
+
     private lateinit var adapter: NoteCardAdapter
 
     // Tracks search input; we debounce it to avoid querying Room on every keystroke
@@ -108,7 +111,8 @@ class NotesFragment : Fragment() {
                 showDeleteDialog(note.id, note.title)
                 true
             },
-            cardFontSize = settingsStorage.getCardFontSize()
+            cardFontSize = settingsStorage.getCardFontSize(),
+            serverUrl = tokenStorage.getServerUrl()
         )
 
         binding.recyclerView.layoutManager = StaggeredGridLayoutManager(

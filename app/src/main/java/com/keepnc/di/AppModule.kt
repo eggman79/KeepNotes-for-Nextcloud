@@ -2,6 +2,8 @@ package com.keepnc.di
 
 import android.content.Context
 import androidx.work.WorkManager
+import coil.ImageLoader
+import coil.disk.DiskCache
 import com.google.gson.Gson
 import com.keepnc.BuildConfig
 import com.keepnc.data.auth.TokenStorage
@@ -91,6 +93,26 @@ object AppModule {
                 }
             )
             .build()
+
+    /**
+     * Coil ImageLoader configured with the authenticated OkHttpClient and a dedicated disk cache.
+     * Allows seamless loading of Nextcloud Notes attachments with HTTP Basic Auth and offline caching.
+     */
+    @Provides
+    @Singleton
+    fun provideImageLoader(
+        @ApplicationContext context: Context,
+        okHttpClient: OkHttpClient
+    ): ImageLoader = ImageLoader.Builder(context)
+        .okHttpClient(okHttpClient)
+        .diskCache {
+            DiskCache.Builder()
+                .directory(context.cacheDir.resolve("image_cache"))
+                .maxSizeBytes(100L * 1024 * 1024) // 100 MB disk cache
+                .build()
+        }
+        .crossfade(true)
+        .build()
 
     @Provides
     @Singleton

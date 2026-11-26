@@ -236,4 +236,24 @@ class AuthInterceptorTest {
         assertNotNull(finalRequest)
         assertEquals("https://my-nextcloud.com/index.php/apps/notes/api/v1/notes", finalRequest?.url.toString())
     }
+
+    @Test
+    fun `intercept does not rewrite or attach auth to third-party URLs`() {
+        val tokenStorage = createDummyTokenStorage("https://my-nextcloud.com")
+        val interceptor = AuthInterceptor(tokenStorage)
+
+        val externalUrl = "https://images.example.org/photos/nature.jpg"
+        val request = Request.Builder()
+            .url(externalUrl)
+            .build()
+
+        val chain = FakeChain(request)
+        interceptor.intercept(chain)
+
+        val finalRequest = chain.interceptedRequest
+        assertNotNull(finalRequest)
+        assertEquals(externalUrl, finalRequest?.url.toString())
+        org.junit.Assert.assertNull(finalRequest?.header("Authorization"))
+        org.junit.Assert.assertNull(finalRequest?.header("OCS-APIREQUEST"))
+    }
 }

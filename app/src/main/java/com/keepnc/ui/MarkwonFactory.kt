@@ -15,13 +15,17 @@ import org.commonmark.node.SoftLineBreak
  * Factory for creating configured [Markwon] instances.
  *
  * Provides:
- * - [createForEditor]: Used in note editor preview with 16dp checkboxes and Google Keep-style gap.
+ * - [createForEditor]: Used in note editor preview with 16dp checkboxes, image loading, and Google Keep-style gap.
  * - [createForCard]: Used in note cards on main screen with compact default checkboxes.
  */
 object MarkwonFactory {
 
-    /** Creates Markwon instance for the note editor with dynamic auto-centering checkboxes. */
-    fun createForEditor(context: Context, checkboxSizeDp: Float = 16f): Markwon {
+    /** Creates Markwon instance for the note editor with dynamic auto-centering checkboxes and image support. */
+    fun createForEditor(
+        context: Context,
+        checkboxSizeDp: Float = 16f,
+        urlResolver: (String) -> String = { it }
+    ): Markwon {
         val density = context.resources.displayMetrics.density
         val totalMarginDp = checkboxSizeDp + 16f
         return Markwon.builder(context)
@@ -29,6 +33,7 @@ object MarkwonFactory {
             .usePlugin(TablePlugin.create(context))
             .usePlugin(TaskListPlugin.create(LargeTaskCheckboxDrawable(context, checkboxSizeDp)))
             .usePlugin(LinkifyPlugin.create())
+            .usePlugin(CoilImagesPlugin.create(context, urlResolver = urlResolver))
             .usePlugin(object : AbstractMarkwonPlugin() {
                 override fun configureTheme(builder: MarkwonTheme.Builder) {
                     // blockMargin sets the indentation before list text:

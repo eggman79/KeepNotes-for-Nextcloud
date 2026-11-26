@@ -10,8 +10,8 @@ import javax.inject.Inject
 
 /**
  * OkHttp interceptor that:
- * 1. Attaches HTTP Basic Auth to every request using credentials from [TokenStorage].
- * 2. Dynamically rewrites the request URL to the stored server URL so Retrofit
+ * 1. Attaches HTTP Basic Auth to requests intended for Nextcloud using credentials from [TokenStorage].
+ * 2. Dynamically rewrites placeholder URLs to the stored server URL so Retrofit
  *    works even if created before login or if the server URL changes.
  *
  * BEGINNER NOTE: OkHttp interceptors run on the background thread that made the
@@ -22,11 +22,23 @@ class AuthInterceptor @Inject constructor(
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        val credentials = tokenStorage.getCredentials()
         val originalRequest = chain.request()
+        val originalUrl = originalRequest.url
         val requestBuilder = originalRequest.newBuilder()
 
-        if (credentials != null) {
+        val rawServerUrl = tokenStorage.getServerUrl()
+        val targetBaseUrl = if (!rawServerUrl.isNullOrBlank()) {
+            val serverUrl = ServerUrlUtils.normalizeServerUrl(rawServerUrl)
+            "$serverUrl/index.php/apps/notes/api/v1/".toHttpUrlOrNull()
+        } else null
+
+        // Only attach Nextcloud credentials if the request is targeting Nextcloud or placeholder
+        val isTargetingNextcloud = targetBaseUrl != null && (
+            originalUrl.host == "placeholder.invalid" || originalUrl.host == targetBaseUrl.host
+        )
+
+        val credentials = tokenStorage.getCredentials()
+        if (credentials != null && isTargetingNextcloud) {
             // Build "loginName:appPassword", base64-encode it, attach as Authorization header
             val encoded = Base64.encodeToString(
                 "${credentials.loginName}:${credentials.appPassword}".toByteArray(Charsets.UTF_8),
@@ -37,39 +49,33 @@ class AuthInterceptor @Inject constructor(
             requestBuilder.header("OCS-APIREQUEST", "true")
         }
 
-        // Dynamic server URL resolution
-        val rawServerUrl = tokenStorage.getServerUrl()
-        if (!rawServerUrl.isNullOrBlank()) {
-            val serverUrl = ServerUrlUtils.normalizeServerUrl(rawServerUrl)
-            val targetBaseUrl = "$serverUrl/index.php/apps/notes/api/v1/".toHttpUrlOrNull()
-            if (targetBaseUrl != null) {
-                val originalUrl = originalRequest.url
-                val newUrlBuilder = targetBaseUrl.newBuilder()
-                // Find path relative to api/v1/
-                val v1Index = originalUrl.pathSegments.indexOf("v1")
-                val relativeSegments = if (v1Index != -1 && v1Index < originalUrl.pathSegments.size - 1) {
-                    originalUrl.pathSegments.subList(
-                        v1Index + 1,
-                        originalUrl.pathSegments.size
-                    )
-                } else if (v1Index == -1) {
-                    // Fallback if URL had no v1 prefix — extract relative endpoint segments
-                    val notesIndex = originalUrl.pathSegments.indexOf("notes")
-                    if (notesIndex != -1) {
-                        originalUrl.pathSegments.subList(notesIndex, originalUrl.pathSegments.size)
-                    } else {
-                        originalUrl.pathSegments.filter { it.isNotBlank() }
-                    }
+        // Dynamic server URL resolution (only for Nextcloud API / placeholder endpoints)
+        if (targetBaseUrl != null && isTargetingNextcloud) {
+            val newUrlBuilder = targetBaseUrl.newBuilder()
+            // Find path relative to api/v1/
+            val v1Index = originalUrl.pathSegments.indexOf("v1")
+            val relativeSegments = if (v1Index != -1 && v1Index < originalUrl.pathSegments.size - 1) {
+                originalUrl.pathSegments.subList(
+                    v1Index + 1,
+                    originalUrl.pathSegments.size
+                )
+            } else if (v1Index == -1) {
+                // Fallback if URL had no v1 prefix — extract relative endpoint segments
+                val notesIndex = originalUrl.pathSegments.indexOf("notes")
+                if (notesIndex != -1) {
+                    originalUrl.pathSegments.subList(notesIndex, originalUrl.pathSegments.size)
                 } else {
-                    emptyList()
+                    originalUrl.pathSegments.filter { it.isNotBlank() }
                 }
-
-                for (segment in relativeSegments) {
-                    newUrlBuilder.addPathSegment(segment)
-                }
-                originalUrl.encodedQuery?.let { newUrlBuilder.encodedQuery(it) }
-                requestBuilder.url(newUrlBuilder.build())
+            } else {
+                emptyList()
             }
+
+            for (segment in relativeSegments) {
+                newUrlBuilder.addPathSegment(segment)
+            }
+            originalUrl.encodedQuery?.let { newUrlBuilder.encodedQuery(it) }
+            requestBuilder.url(newUrlBuilder.build())
         }
 
         val finalRequest = requestBuilder.build()

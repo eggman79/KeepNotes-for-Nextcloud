@@ -32,6 +32,10 @@ class EditorViewModel @Inject constructor(
     // Holds the local DB id of the note being edited; null means new note
     private var noteId: Long? = null
 
+    /** Server ID of the note if synced with Nextcloud (used for attachment URL resolution). */
+    var serverId: Long? = null
+        private set
+
     // Initial snapshot of the note when loaded — used to detect unsaved changes
     private var initialTitle: String = ""
     private var initialContent: String = ""
@@ -66,6 +70,7 @@ class EditorViewModel @Inject constructor(
         if (id == null || id == -1L) {
             // New note
             noteId = null
+            serverId = null
             initialTitle = ""
             initialContent = ""
             initialCategory = ""
@@ -94,6 +99,7 @@ class EditorViewModel @Inject constructor(
                 val note = repository.getNoteById(id)
                 if (note != null) {
                     noteId = note.id
+                    serverId = note.serverId
 
                     val titleTrimmed = note.title.trim()
                     val firstLine = note.content.substringBefore('\n').trim()

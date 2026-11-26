@@ -88,10 +88,14 @@ dependencies {
 
     // Markwon (Markdown rendering in TextView)
     implementation("io.noties.markwon:core:4.6.2")
+    implementation("io.noties.markwon:image:4.6.2")
     implementation("io.noties.markwon:ext-strikethrough:4.6.2")
     implementation("io.noties.markwon:ext-tables:4.6.2")
     implementation("io.noties.markwon:linkify:4.6.2")
     implementation("io.noties.markwon:ext-tasklist:4.6.2")
+
+    // Coil (Image loading and disk/memory caching)
+    implementation("io.coil-kt:coil:2.7.0")
 
     // EncryptedSharedPreferences (secure token storage)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
