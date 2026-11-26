@@ -74,10 +74,13 @@
     <!-- Editor Bottom Actions -->
     <string name="editor_toggle_checkboxes">Kontrollkästchen</string>
     <string name="editor_more_actions">Weitere Optionen</string>
+    <string name="editor_action_add_images">Bild hinzufügen</string>
     <string name="editor_action_show_checkboxes">Checkliste erstellen</string>
     <string name="editor_action_hide_checkboxes">Fließtext</string>
     <string name="editor_action_category">Kategorie</string>
     <string name="editor_action_delete_note">Notiz löschen</string>
+    <string name="editor_uploading_images">Bild %1$d von %2$d wird hochgeladen…</string>
+    <string name="editor_upload_failed">Fehler beim Hochladen des Bildes: %1$s</string>
 
     <!-- Accessibility -->
     <string name="cd_new_note">Notiz erstellen</string>

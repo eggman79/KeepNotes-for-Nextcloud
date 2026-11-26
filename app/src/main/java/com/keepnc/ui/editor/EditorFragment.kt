@@ -1,7 +1,10 @@
 package com.keepnc.ui.editor
 
+import android.content.ContentResolver
 import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.text.Editable
 import android.text.Selection
 import android.text.Spannable
@@ -19,6 +22,8 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.MenuProvider
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
@@ -30,12 +35,15 @@ import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.keepnc.R
+import com.keepnc.data.remote.AttachmentUploadItem
 import com.keepnc.data.settings.SettingsStorage
 import com.keepnc.databinding.FragmentEditorBinding
 import com.keepnc.ui.MarkwonFactory
 import dagger.hilt.android.AndroidEntryPoint
 import io.noties.markwon.ext.tasklist.TaskListSpan
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -75,6 +83,16 @@ class EditorFragment : Fragment() {
     private var fieldsPopulated = false
     private var isPreviewMode = false
 
+    private var uploadSnackbar: Snackbar? = null
+
+    private val pickMultipleMedia = registerForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            handleSelectedImages(uris)
+        }
+    }
+
     /** Prevents the task-list auto-complete TextWatcher from triggering itself recursively. */
     private var isInsertingTaskPrefix = false
 
@@ -107,6 +125,8 @@ class EditorFragment : Fragment() {
         observeCategory()
         observeFavorite()
         observeDraftRestored()
+        observeUploadProgress()
+        observeUploadError()
         observeFieldsOnce()
         setupBackHandler()
         applyFontSize()
@@ -205,6 +225,11 @@ class EditorFragment : Fragment() {
     private fun showActionsBottomSheet() {
         val currentContent = binding.etContent.text?.toString() ?: ""
         val sheet = EditorActionsBottomSheet.newInstance(isFullChecklist(currentContent))
+        sheet.onAddImagesClickListener = {
+            pickMultipleMedia.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+            )
+        }
         sheet.onToggleCheckboxesListener = {
             toggleChecklistMode()
         }
@@ -839,7 +864,101 @@ class EditorFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        uploadSnackbar?.dismiss()
+        uploadSnackbar = null
         _binding = null
+    }
+
+    // =========================================================================
+    // Image Attachments
+    // =========================================================================
+
+    private fun handleSelectedImages(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        val cursor = if (isPreviewMode) -1 else binding.etContent.selectionStart
+        val contentResolver = requireContext().contentResolver
+
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val items = uris.mapNotNull { uri ->
+                try {
+                    val mimeType = contentResolver.getType(uri) ?: "image/jpeg"
+                    val fileName = queryFileName(contentResolver, uri) ?: "image_${System.currentTimeMillis()}.jpg"
+                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    if (bytes != null && bytes.isNotEmpty()) {
+                        AttachmentUploadItem(fileName, mimeType, bytes)
+                    } else null
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            if (items.isNotEmpty()) {
+                withContext(Dispatchers.Main) {
+                    viewModel.uploadAndInsertAttachments(items, cursor) { newContent, newCursor ->
+                        binding.etContent.setText(newContent)
+                        if (isPreviewMode) {
+                            applyMode(true)
+                        } else {
+                            if (newCursor in 0..newContent.length) {
+                                binding.etContent.setSelection(newCursor)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun queryFileName(contentResolver: ContentResolver, uri: Uri): String? {
+        if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
+            try {
+                contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1) {
+                            return cursor.getString(nameIndex)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore and fall back to lastPathSegment
+            }
+        }
+        return uri.lastPathSegment
+    }
+
+    private fun observeUploadProgress() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uploadProgress.collect { progress ->
+                    if (progress != null) {
+                        val msg = getString(R.string.editor_uploading_images, progress.current, progress.total)
+                        val bar = uploadSnackbar
+                        if (bar == null) {
+                            uploadSnackbar = Snackbar.make(binding.root, msg, Snackbar.LENGTH_INDEFINITE).apply {
+                                show()
+                            }
+                        } else {
+                            bar.setText(msg)
+                        }
+                    } else {
+                        uploadSnackbar?.dismiss()
+                        uploadSnackbar = null
+                    }
+                }
+            }
+        }
+    }
+
+    private fun observeUploadError() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uploadError.collect { errorMsg ->
+                    val msg = getString(R.string.editor_upload_failed, errorMsg)
+                    Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     companion object {

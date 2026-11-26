@@ -13,6 +13,7 @@ import com.keepnc.data.local.NoteDao
 import com.keepnc.data.local.NoteEntity
 import com.keepnc.data.local.SyncStatus
 import com.keepnc.data.remote.NotesApi
+import com.keepnc.data.remote.dto.AttachmentDto
 import com.keepnc.data.remote.dto.NoteCreateRequest
 import com.keepnc.data.remote.dto.NoteDto
 import com.keepnc.data.remote.dto.NoteUpdateRequest
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,6 +38,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LoginViewModelTest {
@@ -259,5 +262,7 @@ class LoginViewModelTest {
         override suspend fun createNote(note: NoteCreateRequest): NoteDto = NoteDto(id = 999L)
         override suspend fun updateNote(id: Long, note: NoteUpdateRequest): NoteDto = NoteDto(id = id)
         override suspend fun deleteNote(id: Long) {}
+        override suspend fun uploadAttachment(noteId: Long, file: MultipartBody.Part): AttachmentDto = AttachmentDto("photo.jpg")
+        override suspend fun deleteAttachment(noteId: Long, path: String): Response<Unit> = Response.success(Unit)
     }
 }

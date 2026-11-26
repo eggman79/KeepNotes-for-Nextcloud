@@ -4,15 +4,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.keepnc.data.local.DraftStorage
 import com.keepnc.data.local.NoteDraft
+import com.keepnc.data.remote.AttachmentUploadItem
+import com.keepnc.data.remote.AttachmentUrlUtils
 import com.keepnc.data.repository.NotesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+data class UploadProgress(val current: Int, val total: Int)
 
 /**
  * ViewModel for the note editor.
@@ -30,11 +37,25 @@ class EditorViewModel @Inject constructor(
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     // Holds the local DB id of the note being edited; null means new note
-    private var noteId: Long? = null
+    var noteId: Long? = null
+        private set
 
     /** Server ID of the note if synced with Nextcloud (used for attachment URL resolution). */
     var serverId: Long? = null
         private set
+
+    /** Tracks attachments uploaded to Nextcloud during this editing session. */
+    val stagedAttachments = mutableSetOf<String>()
+
+    /** True if a local/remote note was temporarily created solely to hold uploaded attachments. */
+    var isNewNoteCreatedForAttachments: Boolean = false
+        private set
+
+    private val _uploadProgress = MutableStateFlow<UploadProgress?>(null)
+    val uploadProgress: StateFlow<UploadProgress?> = _uploadProgress.asStateFlow()
+
+    private val _uploadError = MutableSharedFlow<String>()
+    val uploadError: SharedFlow<String> = _uploadError.asSharedFlow()
 
     // Initial snapshot of the note when loaded — used to detect unsaved changes
     private var initialTitle: String = ""
@@ -66,6 +87,8 @@ class EditorViewModel @Inject constructor(
      */
     fun loadNote(id: Long?) {
         _uiState.value = EditorUiState.Loading
+        stagedAttachments.clear()
+        isNewNoteCreatedForAttachments = false
 
         if (id == null || id == -1L) {
             // New note
@@ -177,6 +200,91 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
+     * Uploads multiple image attachments to Nextcloud sequentially and inserts Markdown
+     * tags into the note content (at cursor position or at the end).
+     */
+    fun uploadAndInsertAttachments(
+        items: List<AttachmentUploadItem>,
+        cursorPosition: Int,
+        onComplete: ((newContent: String, newCursorPosition: Int) -> Unit)? = null
+    ) {
+        if (items.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                // Ensure note has serverId on Nextcloud
+                var currentServerId = serverId
+                if (currentServerId == null) {
+                    var currentId = noteId
+                    if (currentId == null) {
+                        currentId = repository.createNote(
+                            title.value,
+                            content.value,
+                            category.value,
+                            isFavorite.value
+                        )
+                        noteId = currentId
+                        isNewNoteCreatedForAttachments = true
+                    }
+                    currentServerId = repository.ensureServerId(currentId)
+                    serverId = currentServerId
+                }
+
+                val uploaded = mutableListOf<Pair<String, String>>() // (fileName, serverFilename)
+
+                items.forEachIndexed { index, item ->
+                    _uploadProgress.value = UploadProgress(current = index + 1, total = items.size)
+                    val result = repository.uploadAttachment(currentServerId, item)
+                    result.fold(
+                        onSuccess = { serverFilename ->
+                            stagedAttachments.add(serverFilename)
+                            uploaded.add(item.fileName to serverFilename)
+                        },
+                        onFailure = { error ->
+                            _uploadError.emit(error.message ?: "Upload failed")
+                        }
+                    )
+                }
+
+                if (uploaded.isNotEmpty()) {
+                    val currentText = content.value
+                    val markdownSnippet = uploaded.joinToString("\n") { (name, path) -> "![$name]($path)" }
+                    val (newContent, newCursor) = AttachmentUrlUtils.insertMarkdownIntoContent(
+                        currentText,
+                        markdownSnippet,
+                        cursorPosition
+                    )
+                    content.value = newContent
+                    onComplete?.invoke(newContent, newCursor)
+                }
+            } catch (e: Exception) {
+                _uploadError.emit(e.message ?: "Upload failed")
+            } finally {
+                _uploadProgress.value = null
+            }
+        }
+    }
+
+    /**
+     * Cleans up attachments that were uploaded during this session but subsequently
+     * deleted by the user from [contentText] before saving.
+     */
+    private fun cleanupRemovedStagedAttachments(contentText: String) {
+        val currentImages = AttachmentUrlUtils.extractAllImageUrls(contentText)
+        val removed = stagedAttachments.filter { it !in currentImages }
+        val sId = serverId
+        if (removed.isNotEmpty() && sId != null) {
+            viewModelScope.launch {
+                removed.forEach { path ->
+                    repository.deleteAttachment(sId, path)
+                }
+            }
+        }
+        stagedAttachments.clear()
+        isNewNoteCreatedForAttachments = false
+    }
+
+    /**
      * Automatically saves current changes to local Room database and triggers server sync,
      * without navigating away from the editor screen.
      */
@@ -206,6 +314,8 @@ class EditorViewModel @Inject constructor(
                 initialCategory = categoryText
                 initialFavorite = favorite
                 hasRestoredDraft.value = false
+
+                cleanupRemovedStagedAttachments(contentText)
 
                 draftStorage.clearDraft(currentId)
                 draftStorage.clearDraft(savedId)
@@ -243,11 +353,37 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
+     * Discards changes made in this session:
+     * Deletes any attachments uploaded to Nextcloud that were not saved,
+     * and deletes temporary note if created purely for attachments.
+     */
+    fun discardChanges() {
+        val sId = serverId
+        val nId = noteId
+        if (stagedAttachments.isNotEmpty() && sId != null) {
+            val toDelete = stagedAttachments.toSet()
+            stagedAttachments.clear()
+            viewModelScope.launch {
+                toDelete.forEach { path ->
+                    repository.deleteAttachment(sId, path)
+                }
+            }
+        }
+        if (isNewNoteCreatedForAttachments && nId != null) {
+            isNewNoteCreatedForAttachments = false
+            viewModelScope.launch {
+                repository.deleteNote(nId)
+            }
+        }
+        draftStorage.clearDraft(noteId)
+        draftStorage.clearDraft(null)
+    }
+
+    /**
      * Discards the restored draft and reverts fields back to the initial Room note state.
      */
     fun discardDraft() {
-        draftStorage.clearDraft(noteId)
-        draftStorage.clearDraft(null)
+        discardChanges()
         hasRestoredDraft.value = false
         title.value = initialTitle
         content.value = initialContent
@@ -267,8 +403,7 @@ class EditorViewModel @Inject constructor(
     ) {
         // Don't save completely empty new notes
         if (titleText.isBlank() && contentText.isBlank()) {
-            draftStorage.clearDraft(noteId)
-            draftStorage.clearDraft(null)
+            discardChanges()
             _uiState.value = EditorUiState.Saved
             return
         }
@@ -282,12 +417,14 @@ class EditorViewModel @Inject constructor(
                 } else {
                     repository.updateNote(currentId, titleText, contentText, categoryText, favorite)
                 }
+                cleanupRemovedStagedAttachments(contentText)
                 draftStorage.clearDraft(currentId)
                 draftStorage.clearDraft(null)
                 // Immediately sync with the server after saving
                 repository.syncWithServer()
                 _uiState.value = EditorUiState.Saved
             } catch (e: Exception) {
+                cleanupRemovedStagedAttachments(contentText)
                 draftStorage.clearDraft(noteId)
                 draftStorage.clearDraft(null)
                 _uiState.value = EditorUiState.Saved
@@ -301,6 +438,8 @@ class EditorViewModel @Inject constructor(
      */
     fun deleteNote() {
         val currentId = noteId
+        stagedAttachments.clear()
+        isNewNoteCreatedForAttachments = false
         draftStorage.clearDraft(currentId)
         draftStorage.clearDraft(null)
 

@@ -74,10 +74,13 @@
     <!-- Editor Bottom Actions -->
     <string name="editor_toggle_checkboxes">Caixas de seleção</string>
     <string name="editor_more_actions">Mais opções</string>
+    <string name="editor_action_add_images">Adicionar imagem</string>
     <string name="editor_action_show_checkboxes">Fazer lista</string>
     <string name="editor_action_hide_checkboxes">Texto simples</string>
     <string name="editor_action_category">Categoria</string>
     <string name="editor_action_delete_note">Eliminar nota</string>
+    <string name="editor_uploading_images">Enviando imagem %1$d de %2$d…</string>
+    <string name="editor_upload_failed">Falha ao enviar imagem: %1$s</string>
 
     <!-- Accessibility -->
     <string name="cd_new_note">Criar nota</string>

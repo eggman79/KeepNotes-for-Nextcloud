@@ -74,10 +74,13 @@
     <!-- Editor Bottom Actions -->
     <string name="editor_toggle_checkboxes">Casillas</string>
     <string name="editor_more_actions">Más opciones</string>
+    <string name="editor_action_add_images">Añadir imagen</string>
     <string name="editor_action_show_checkboxes">Crear lista</string>
     <string name="editor_action_hide_checkboxes">Texto plano</string>
     <string name="editor_action_category">Categoría</string>
     <string name="editor_action_delete_note">Eliminar nota</string>
+    <string name="editor_uploading_images">Subiendo imagen %1$d de %2$d…</string>
+    <string name="editor_upload_failed">Error al subir la imagen: %1$s</string>
 
     <!-- Accessibility -->
     <string name="cd_new_note">Crear nota</string>

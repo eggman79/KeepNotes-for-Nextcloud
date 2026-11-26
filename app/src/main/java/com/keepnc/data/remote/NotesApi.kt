@@ -1,14 +1,20 @@
 package com.keepnc.data.remote
 
+import com.keepnc.data.remote.dto.AttachmentDto
 import com.keepnc.data.remote.dto.NoteCreateRequest
 import com.keepnc.data.remote.dto.NoteDto
 import com.keepnc.data.remote.dto.NoteUpdateRequest
+import okhttp3.MultipartBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * Retrofit interface for the Nextcloud Notes API v1.
@@ -47,4 +53,19 @@ interface NotesApi {
     /** Delete a note permanently. Returns 200 with no body on success. */
     @DELETE("notes/{id}")
     suspend fun deleteNote(@Path("id") id: Long)
+
+    /** Upload an attachment (image) to a note. */
+    @Multipart
+    @POST("attachment/{noteId}")
+    suspend fun uploadAttachment(
+        @Path("noteId") noteId: Long,
+        @Part file: MultipartBody.Part
+    ): AttachmentDto
+
+    /** Delete an attachment from a note. */
+    @DELETE("attachment/{noteId}")
+    suspend fun deleteAttachment(
+        @Path("noteId") noteId: Long,
+        @Query("path") path: String
+    ): Response<Unit>
 }

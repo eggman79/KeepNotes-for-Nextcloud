@@ -4,6 +4,7 @@ import android.util.Log
 import com.keepnc.data.local.NoteDao
 import com.keepnc.data.local.NoteEntity
 import com.keepnc.data.local.SyncStatus
+import com.keepnc.data.remote.AttachmentUploadItem
 import com.keepnc.data.remote.NotesApi
 import com.keepnc.data.remote.dto.NoteCreateRequest
 import com.keepnc.data.remote.dto.NoteDto
@@ -18,6 +19,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -127,6 +131,72 @@ class NotesRepository @Inject constructor(
             noteDao.deleteById(id)
         } else {
             noteDao.update(existing.copy(syncStatus = SyncStatus.PENDING_DELETE))
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Attachment operations (Nextcloud Notes Attachment API v1.4)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Ensures the note exists on Nextcloud server so it has a valid [NoteEntity.serverId].
+     * If the note is already synced, returns its existing serverId immediately.
+     * Otherwise, pushes the note to Nextcloud to acquire its serverId.
+     */
+    suspend fun ensureServerId(localId: Long): Long = withContext(ioDispatcher) {
+        val existing = noteDao.getNoteById(localId)
+            ?: throw IllegalStateException("Note $localId does not exist in local database")
+
+        if (existing.serverId != null) {
+            return@withContext existing.serverId
+        }
+
+        val dto = notesApi.createNote(
+            NoteCreateRequest(existing.title, existing.content, existing.category, existing.favorite)
+        )
+        val updated = existing.copy(
+            serverId = dto.id,
+            etag = dto.etag,
+            modified = dto.modified,
+            syncStatus = SyncStatus.SYNCED
+        )
+        noteDao.update(updated)
+        dto.id
+    }
+
+    /**
+     * Uploads an image attachment to Nextcloud for the given [serverId].
+     * Returns [Result.success] with the relative attachment path (e.g. `.attachments.36903/xyz.jpg`)
+     * or [Result.failure] on error.
+     */
+    suspend fun uploadAttachment(
+        serverId: Long,
+        item: AttachmentUploadItem
+    ): Result<String> = withContext(ioDispatcher) {
+        runCatching {
+            val mediaType = item.mimeType.toMediaTypeOrNull() ?: "image/*".toMediaTypeOrNull()
+            val requestBody = item.bytes.toRequestBody(mediaType)
+            val part = MultipartBody.Part.createFormData("file", item.fileName, requestBody)
+            val dto = notesApi.uploadAttachment(serverId, part)
+            dto.filename
+        }
+    }
+
+    /**
+     * Deletes an attachment from Nextcloud server for the given [serverId] and [path].
+     * Succeeds silently if the file is already deleted (HTTP 404).
+     */
+    suspend fun deleteAttachment(
+        serverId: Long,
+        path: String
+    ): Result<Unit> = withContext(ioDispatcher) {
+        runCatching {
+            try {
+                notesApi.deleteAttachment(serverId, path)
+            } catch (e: HttpException) {
+                if (e.code() != 404) throw e
+            }
+            Unit
         }
     }
 

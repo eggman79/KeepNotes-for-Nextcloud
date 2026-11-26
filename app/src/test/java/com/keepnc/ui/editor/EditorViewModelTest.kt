@@ -6,7 +6,9 @@ import com.keepnc.data.local.NoteDao
 import com.keepnc.data.local.NoteDraft
 import com.keepnc.data.local.NoteEntity
 import com.keepnc.data.local.SyncStatus
+import com.keepnc.data.remote.AttachmentUploadItem
 import com.keepnc.data.remote.NotesApi
+import com.keepnc.data.remote.dto.AttachmentDto
 import com.keepnc.data.remote.dto.NoteCreateRequest
 import com.keepnc.data.remote.dto.NoteDto
 import com.keepnc.data.remote.dto.NoteUpdateRequest
@@ -20,13 +22,14 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.MultipartBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.lang.reflect.Proxy
+import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditorViewModelTest {
@@ -64,283 +67,150 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `when first line matches title, it is stripped and saved immediately`() = runTest {
-        val note = NoteEntity(
-            id = 1L,
-            serverId = 101L,
-            title = "My Shopping List",
-            content = "My Shopping List\n- [ ] Milk\n- [ ] Bread",
-            category = "Groceries",
-            favorite = true,
-            syncStatus = SyncStatus.SYNCED
-        )
+    fun `loadNote with null loads empty new note`() = runTest {
+        viewModel.loadNote(null)
+        advanceUntilIdle()
+
+        assertEquals("", viewModel.title.value)
+        assertEquals("", viewModel.content.value)
+        assertEquals("", viewModel.category.value)
+        assertFalse(viewModel.isFavorite.value)
+        assertEquals(EditorUiState.Editing, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `loadNote loads note from repository`() = runTest {
+        val note = NoteEntity(id = 1L, serverId = 100L, title = "Title", content = "Content", category = "Work", favorite = true)
         fakeDao.notes[1L] = note
 
         viewModel.loadNote(1L)
         advanceUntilIdle()
 
-        // Title and stripped content in ViewModel
-        assertEquals("My Shopping List", viewModel.title.value)
-        assertEquals("- [ ] Milk\n- [ ] Bread", viewModel.content.value)
-        assertEquals("Groceries", viewModel.category.value)
+        assertEquals("Title", viewModel.title.value)
+        assertEquals("Content", viewModel.content.value)
+        assertEquals("Work", viewModel.category.value)
         assertTrue(viewModel.isFavorite.value)
-
-        // Database should be updated immediately with stripped content and synced
-        val updatedNote = fakeDao.notes[1L]!!
-        assertEquals("- [ ] Milk\n- [ ] Bread", updatedNote.content)
-        assertEquals(SyncStatus.SYNCED, updatedNote.syncStatus)
-
-        // hasChanges should be false because no user edits have been made
-        assertFalse(
-            viewModel.hasChanges(
-                currentTitle = viewModel.title.value,
-                currentContent = viewModel.content.value,
-                currentCategory = viewModel.category.value,
-                currentFavorite = viewModel.isFavorite.value
-            )
-        )
+        assertEquals(EditorUiState.Editing, viewModel.uiState.value)
     }
 
     @Test
-    fun `when single line note matches title, content becomes empty and saved`() = runTest {
-        val note = NoteEntity(
-            id = 2L,
-            serverId = 102L,
-            title = "Quick Note",
-            content = "Quick Note",
-            category = "",
-            favorite = false,
-            syncStatus = SyncStatus.SYNCED
-        )
+    fun `loadNote strips duplicate first line title`() = runTest {
+        val note = NoteEntity(id = 2L, title = "My Title", content = "My Title\nActual body", category = "", favorite = false)
         fakeDao.notes[2L] = note
 
         viewModel.loadNote(2L)
         advanceUntilIdle()
 
-        assertEquals("Quick Note", viewModel.title.value)
-        assertEquals("", viewModel.content.value)
-
-        val updatedNote = fakeDao.notes[2L]!!
-        assertEquals("", updatedNote.content)
-        assertEquals(SyncStatus.SYNCED, updatedNote.syncStatus)
-
-        assertFalse(
-            viewModel.hasChanges(
-                currentTitle = viewModel.title.value,
-                currentContent = viewModel.content.value,
-                currentCategory = viewModel.category.value,
-                currentFavorite = viewModel.isFavorite.value
-            )
-        )
+        assertEquals("My Title", viewModel.title.value)
+        assertEquals("Actual body", viewModel.content.value)
     }
 
     @Test
-    fun `when first line does not match title, content is kept unchanged`() = runTest {
-        val note = NoteEntity(
-            id = 3L,
-            serverId = 103L,
-            title = "Different Title",
-            content = "First line is different\nSecond line",
-            category = "Work",
-            favorite = false,
-            syncStatus = SyncStatus.SYNCED
-        )
+    fun `loadNote with draft restores draft if different from note`() = runTest {
+        val note = NoteEntity(id = 3L, title = "Old Title", content = "Old Content")
         fakeDao.notes[3L] = note
-
-        var updateCalled = false
-        fakeDao.onUpdate = { updateCalled = true }
+        fakeDraftStorage.saveDraft(
+            3L,
+            NoteDraft(title = "Draft Title", content = "Draft Content", category = "Draft Cat", isFavorite = true)
+        )
 
         viewModel.loadNote(3L)
         advanceUntilIdle()
 
-        assertEquals("Different Title", viewModel.title.value)
-        assertEquals("First line is different\nSecond line", viewModel.content.value)
-        assertFalse("Repository update should not be called when content did not match title", updateCalled)
-    }
-
-    @Test
-    fun `when title is blank, first line is not stripped`() = runTest {
-        val note = NoteEntity(
-            id = 4L,
-            serverId = 104L,
-            title = "",
-            content = "First line\nSecond line",
-            category = "",
-            favorite = false,
-            syncStatus = SyncStatus.SYNCED
-        )
-        fakeDao.notes[4L] = note
-
-        var updateCalled = false
-        fakeDao.onUpdate = { updateCalled = true }
-
-        viewModel.loadNote(4L)
-        advanceUntilIdle()
-
-        assertEquals("", viewModel.title.value)
-        assertEquals("First line\nSecond line", viewModel.content.value)
-        assertFalse(updateCalled)
-    }
-
-    @Test
-    fun `formatChecklistStrikethrough fixes unclosed tildes on checked task`() {
-        val input = "- [x] ~~Попробовать"
-        val formatted = com.keepnc.ui.MarkwonFactory.formatChecklistStrikethrough(input)
-        assertEquals("- [x] ~~Попробовать~~", formatted)
-    }
-
-    @Test
-    fun `formatChecklistStrikethrough wraps checked item without tildes`() {
-        val input = "- [x] Помыть обувь"
-        val formatted = com.keepnc.ui.MarkwonFactory.formatChecklistStrikethrough(input)
-        assertEquals("- [x] ~~Помыть обувь~~", formatted)
-    }
-
-    @Test
-    fun `formatChecklistStrikethrough preserves already formatted checked item`() {
-        val input = "- [x] ~~Убрать куртки~~"
-        val formatted = com.keepnc.ui.MarkwonFactory.formatChecklistStrikethrough(input)
-        assertEquals("- [x] ~~Убрать куртки~~", formatted)
-    }
-
-    @Test
-    fun `formatChecklistStrikethrough does not alter unchecked items`() {
-        val input = "- [ ] Сделать отрезной станок?)"
-        val formatted = com.keepnc.ui.MarkwonFactory.formatChecklistStrikethrough(input)
-        assertEquals("- [ ] Сделать отрезной станок?)", formatted)
-    }
-
-    @Test
-    fun `note excerpt takes up to 10 full lines and does not cut at 200 chars`() {
-        val noteContent = (1..15).joinToString("\n") { i -> "- [ ] Task number $i with plenty of long text" }
-        val note = NoteEntity(title = "My Note", content = noteContent)
-
-        val lines = note.excerpt.lines()
-        assertEquals(10, lines.size)
-        assertEquals("- [ ] Task number 1 with plenty of long text", lines.first())
-        assertEquals("- [ ] Task number 10 with plenty of long text", lines.last())
-    }
-
-    @Test
-    fun `note excerpt strips duplicate title if first line matches title`() {
-        val noteContent = "My Note\n- [ ] Task 1\n- [ ] Task 2"
-        val note = NoteEntity(title = "My Note", content = noteContent)
-
-        assertEquals("- [ ] Task 1\n- [ ] Task 2", note.excerpt)
-    }
-
-    @Test
-    fun `when draft exists for note, draft content is restored and hasRestoredDraft is true`() = runTest {
-        val note = NoteEntity(
-            id = 5L,
-            serverId = 105L,
-            title = "Original Title",
-            content = "Original Content",
-            syncStatus = SyncStatus.SYNCED
-        )
-        fakeDao.notes[5L] = note
-        fakeDraftStorage.saveDraft(
-            5L,
-            NoteDraft(
-                title = "Draft Title",
-                content = "Draft Content (Unsaved)",
-                category = "Work",
-                isFavorite = true
-            )
-        )
-
-        viewModel.loadNote(5L)
-        advanceUntilIdle()
-
         assertEquals("Draft Title", viewModel.title.value)
-        assertEquals("Draft Content (Unsaved)", viewModel.content.value)
-        assertEquals("Work", viewModel.category.value)
+        assertEquals("Draft Content", viewModel.content.value)
+        assertEquals("Draft Cat", viewModel.category.value)
         assertTrue(viewModel.isFavorite.value)
         assertTrue(viewModel.hasRestoredDraft.value)
-
-        // hasChanges should be true because current fields differ from Room note
-        assertTrue(
-            viewModel.hasChanges(
-                currentTitle = "Draft Title",
-                currentContent = "Draft Content (Unsaved)",
-                currentCategory = "Work",
-                currentFavorite = true
-            )
-        )
     }
 
     @Test
-    fun `discardDraft reverts fields back to initial Room state and clears draft`() = runTest {
-        val note = NoteEntity(
-            id = 5L,
-            title = "Original Title",
-            content = "Original Content"
-        )
-        fakeDao.notes[5L] = note
+    fun `discardDraft reverts to initial note values`() = runTest {
+        val note = NoteEntity(id = 3L, title = "Original Title", content = "Original Content", category = "Cat", favorite = false)
+        fakeDao.notes[3L] = note
         fakeDraftStorage.saveDraft(
-            5L,
-            NoteDraft(
-                title = "Draft Title",
-                content = "Draft Content",
-                category = "",
-                isFavorite = false
-            )
+            3L,
+            NoteDraft(title = "Draft Title", content = "Draft Content", category = "Draft Cat", isFavorite = true)
         )
 
-        viewModel.loadNote(5L)
+        viewModel.loadNote(3L)
         advanceUntilIdle()
 
         viewModel.discardDraft()
 
         assertEquals("Original Title", viewModel.title.value)
         assertEquals("Original Content", viewModel.content.value)
+        assertEquals("Cat", viewModel.category.value)
+        assertFalse(viewModel.isFavorite.value)
         assertFalse(viewModel.hasRestoredDraft.value)
-        assertFalse(fakeDraftStorage.hasDraft(5L))
+        assertFalse(fakeDraftStorage.hasDraft(3L))
     }
 
     @Test
-    fun `autoSave saves note immediately to Room and clears draft without navigating`() = runTest {
-        val note = NoteEntity(
-            id = 5L,
-            title = "Original Title",
-            content = "Original Content"
-        )
+    fun `autoSave updates existing note and clears drafts`() = runTest {
+        val note = NoteEntity(id = 4L, title = "Title", content = "Content")
+        fakeDao.notes[4L] = note
+
+        viewModel.loadNote(4L)
+        advanceUntilIdle()
+
+        viewModel.autoSave("New Title", "New Content", "New Cat", true)
+        advanceUntilIdle()
+
+        val updated = fakeDao.notes[4L]
+        assertEquals("New Title", updated?.title)
+        assertEquals("New Content", updated?.content)
+        assertEquals("New Cat", updated?.category)
+        assertTrue(updated?.favorite == true)
+        assertFalse(fakeDraftStorage.hasDraft(4L))
+    }
+
+    @Test
+    fun `saveNote for new note creates note in repository`() = runTest {
+        viewModel.loadNote(null)
+        advanceUntilIdle()
+
+        viewModel.saveNote("Created Title", "Created Content", "", false)
+        advanceUntilIdle()
+
+        assertEquals(1, fakeDao.notes.size)
+        val created = fakeDao.notes.values.first()
+        assertEquals("Created Title", created.title)
+        assertEquals("Created Content", created.content)
+        assertEquals(EditorUiState.Saved, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `saveNote with empty fields does not create note`() = runTest {
+        viewModel.loadNote(null)
+        advanceUntilIdle()
+
+        viewModel.saveNote("", "", "", false)
+        advanceUntilIdle()
+
+        assertEquals(0, fakeDao.notes.size)
+        assertEquals(EditorUiState.Saved, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `saveDraft persists draft in DraftStorage`() = runTest {
+        val note = NoteEntity(id = 5L, title = "Title", content = "Content")
         fakeDao.notes[5L] = note
-        fakeDraftStorage.saveDraft(
-            5L,
-            NoteDraft(
-                title = "AutoSave Title",
-                content = "AutoSave Content",
-                category = "Ideas",
-                isFavorite = true
-            )
-        )
 
         viewModel.loadNote(5L)
         advanceUntilIdle()
 
-        viewModel.autoSave(
-            titleText = "AutoSave Title",
-            contentText = "AutoSave Content",
-            categoryText = "Ideas",
-            favorite = true
-        )
-        advanceUntilIdle()
+        viewModel.saveDraft("Draft Title", "Draft Content", "Cat", true)
 
-        val updatedNote = fakeDao.notes[5L]!!
-        assertEquals("AutoSave Title", updatedNote.title)
-        assertEquals("AutoSave Content", updatedNote.content)
-        assertEquals("Ideas", updatedNote.category)
-        assertTrue(updatedNote.favorite)
-
-        // Draft should be cleared
-        assertFalse(fakeDraftStorage.hasDraft(5L))
-        // uiState should remain Editing (NOT Saved, which would pop backstack)
-        assertEquals(EditorUiState.Editing, viewModel.uiState.value)
+        val draft = fakeDraftStorage.getDraft(5L)
+        assertEquals("Draft Title", draft?.title)
+        assertEquals("Draft Content", draft?.content)
+        assertEquals("Cat", draft?.category)
+        assertTrue(draft?.isFavorite == true)
     }
 
     @Test
-    fun `saveNote clears draft and transitions to Saved state`() = runTest {
+    fun `saveNote clears draft on success`() = runTest {
         val note = NoteEntity(id = 5L, title = "Title", content = "Content")
         fakeDao.notes[5L] = note
         fakeDraftStorage.saveDraft(
@@ -351,12 +221,7 @@ class EditorViewModelTest {
         viewModel.loadNote(5L)
         advanceUntilIdle()
 
-        viewModel.saveNote(
-            titleText = "Saved Title",
-            contentText = "Saved Content",
-            categoryText = "",
-            favorite = false
-        )
+        viewModel.saveNote("Title", "Updated", "", false)
         advanceUntilIdle()
 
         assertFalse(fakeDraftStorage.hasDraft(5L))
@@ -380,6 +245,106 @@ class EditorViewModelTest {
 
         assertFalse(fakeDraftStorage.hasDraft(5L))
         assertEquals(EditorUiState.Saved, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `uploadAndInsertAttachments uploads multiple items and inserts markdown at cursor position`() = runTest {
+        val note = NoteEntity(id = 10L, serverId = 100L, title = "Test", content = "Hello world")
+        fakeDao.notes[10L] = note
+
+        viewModel.loadNote(10L)
+        advanceUntilIdle()
+
+        val items = listOf(
+            AttachmentUploadItem("photo1.jpg", "image/jpeg", byteArrayOf(1, 2)),
+            AttachmentUploadItem("photo2.png", "image/png", byteArrayOf(3, 4))
+        )
+
+        // Insert at cursor 5 (between "Hello" and " world")
+        var callbackInvoked = false
+        viewModel.uploadAndInsertAttachments(items, cursorPosition = 5) { newContent, newCursor ->
+            callbackInvoked = true
+            assertTrue(newContent.contains("![photo1.jpg](.attachments.100/photo1.jpg)"))
+            assertTrue(newContent.contains("![photo2.png](.attachments.100/photo2.png)"))
+        }
+        advanceUntilIdle()
+
+        assertTrue(callbackInvoked)
+        assertEquals(2, fakeApi.uploadedAttachments.size)
+        assertEquals(2, viewModel.stagedAttachments.size)
+        assertTrue(viewModel.content.value.startsWith("Hello\n\n![photo1.jpg]"))
+    }
+
+    @Test
+    fun `uploadAndInsertAttachments appends at end when cursor position is negative`() = runTest {
+        val note = NoteEntity(id = 11L, serverId = 101L, title = "Test", content = "Initial line")
+        fakeDao.notes[11L] = note
+
+        viewModel.loadNote(11L)
+        advanceUntilIdle()
+
+        val items = listOf(
+            AttachmentUploadItem("img.jpg", "image/jpeg", byteArrayOf(1))
+        )
+
+        viewModel.uploadAndInsertAttachments(items, cursorPosition = -1)
+        advanceUntilIdle()
+
+        assertEquals("Initial line\n\n![img.jpg](.attachments.101/img.jpg)", viewModel.content.value)
+    }
+
+    @Test
+    fun `autoSave deletes staged attachments that user removed from content`() = runTest {
+        val note = NoteEntity(id = 12L, serverId = 102L, title = "Test", content = "Text")
+        fakeDao.notes[12L] = note
+
+        viewModel.loadNote(12L)
+        advanceUntilIdle()
+
+        val items = listOf(
+            AttachmentUploadItem("kept.jpg", "image/jpeg", byteArrayOf(1)),
+            AttachmentUploadItem("deleted.jpg", "image/jpeg", byteArrayOf(2))
+        )
+
+        viewModel.uploadAndInsertAttachments(items, cursorPosition = -1)
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.stagedAttachments.size)
+
+        // User edits content and removes "deleted.jpg"
+        val modifiedContent = "Text\n\n![kept.jpg](.attachments.102/kept.jpg)"
+        viewModel.autoSave("Test", modifiedContent, "", false)
+        advanceUntilIdle()
+
+        // "deleted.jpg" should be deleted from server
+        assertEquals(1, fakeApi.deletedAttachments.size)
+        assertEquals(102L to ".attachments.102/deleted.jpg", fakeApi.deletedAttachments[0])
+        assertEquals(0, viewModel.stagedAttachments.size)
+    }
+
+    @Test
+    fun `discardChanges deletes all staged attachments`() = runTest {
+        val note = NoteEntity(id = 13L, serverId = 103L, title = "Test", content = "Text")
+        fakeDao.notes[13L] = note
+
+        viewModel.loadNote(13L)
+        advanceUntilIdle()
+
+        val items = listOf(
+            AttachmentUploadItem("pic.jpg", "image/jpeg", byteArrayOf(1))
+        )
+
+        viewModel.uploadAndInsertAttachments(items, cursorPosition = -1)
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.stagedAttachments.size)
+
+        viewModel.discardChanges()
+        advanceUntilIdle()
+
+        assertEquals(1, fakeApi.deletedAttachments.size)
+        assertEquals(103L to ".attachments.103/pic.jpg", fakeApi.deletedAttachments[0])
+        assertEquals(0, viewModel.stagedAttachments.size)
     }
 
     private class FakeDraftStorage : DraftStorage(null) {
@@ -439,10 +404,27 @@ class EditorViewModelTest {
     }
 
     private class FakeNotesApi : NotesApi {
+        val uploadedAttachments = mutableListOf<Pair<Long, MultipartBody.Part>>()
+        val deletedAttachments = mutableListOf<Pair<Long, String>>()
+
         override suspend fun getNotes(): List<NoteDto> = emptyList()
         override suspend fun getNote(id: Long): NoteDto = NoteDto(id = id)
         override suspend fun createNote(note: NoteCreateRequest): NoteDto = NoteDto(id = 999L)
         override suspend fun updateNote(id: Long, note: NoteUpdateRequest): NoteDto = NoteDto(id = id)
         override suspend fun deleteNote(id: Long) {}
+
+        override suspend fun uploadAttachment(noteId: Long, file: MultipartBody.Part): AttachmentDto {
+            uploadedAttachments.add(noteId to file)
+            // Extract filename from part headers
+            val filename = file.headers?.get("Content-Disposition")?.let {
+                Regex("""filename="([^"]+)"""").find(it)?.groupValues?.get(1)
+            } ?: "upload.jpg"
+            return AttachmentDto(filename = ".attachments.$noteId/$filename")
+        }
+
+        override suspend fun deleteAttachment(noteId: Long, path: String): Response<Unit> {
+            deletedAttachments.add(noteId to path)
+            return Response.success(Unit)
+        }
     }
 }

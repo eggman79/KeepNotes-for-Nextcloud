@@ -22,6 +22,7 @@ class EditorActionsBottomSheet : BottomSheetDialogFragment() {
     private var _binding: DialogEditorActionsBinding? = null
     private val binding get() = _binding!!
 
+    var onAddImagesClickListener: (() -> Unit)? = null
     var onToggleCheckboxesListener: (() -> Unit)? = null
     var onCategoryClickListener: (() -> Unit)? = null
     var onDeleteClickListener: (() -> Unit)? = null
@@ -44,6 +45,11 @@ class EditorActionsBottomSheet : BottomSheetDialogFragment() {
             if (hasCheckboxes) R.string.editor_action_hide_checkboxes
             else R.string.editor_action_show_checkboxes
         )
+
+        binding.actionAddImages.setOnClickListener {
+            dismiss()
+            onAddImagesClickListener?.invoke()
+        }
 
         binding.actionToggleCheckboxes.setOnClickListener {
             dismiss()

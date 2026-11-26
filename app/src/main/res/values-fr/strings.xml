@@ -74,10 +74,13 @@
     <!-- Editor Bottom Actions -->
     <string name="editor_toggle_checkboxes">Cases à cocher</string>
     <string name="editor_more_actions">Plus d\'options</string>
+    <string name="editor_action_add_images">Ajouter une image</string>
     <string name="editor_action_show_checkboxes">Faire une liste</string>
     <string name="editor_action_hide_checkboxes">Texte brut</string>
     <string name="editor_action_category">Catégorie</string>
     <string name="editor_action_delete_note">Supprimer la note</string>
+    <string name="editor_uploading_images">Téléversement de l\'image %1$d sur %2$d…</string>
+    <string name="editor_upload_failed">Échec du téléversement de l\'image : %1$s</string>
 
     <!-- Accessibility -->
     <string name="cd_new_note">Créer une note</string>
