@@ -133,4 +133,21 @@
     <string name="settings_section_about">Über KeepNotes</string>
     <string name="settings_app_version">Version %1$s</string>
     <string name="settings_server_url">Verbundener Server</string>
+
+    <!-- Attachments & Image actions -->
+    <string name="action_save_image">In Galerie speichern</string>
+    <string name="action_share_image">Teilen</string>
+    <string name="action_delete_image">Bild löschen</string>
+    <string name="action_manage_attachments">Bilder in Notiz (%1$d)</string>
+    <string name="image_saved_to_gallery">Bild unter Bilder gespeichert</string>
+    <string name="images_saved_to_gallery">%1$d Bilder unter Bilder gespeichert</string>
+    <string name="image_save_failed">Bild konnte nicht gespeichert werden</string>
+    <string name="delete_image_title">Bild löschen?</string>
+    <string name="delete_image_message">Dieses Bild wird aus der Notiz und Nextcloud entfernt.</string>
+    <string name="delete_images_title">Bilder löschen?</string>
+    <string name="delete_images_message">Ausgewählte Bilder werden aus der Notiz und Nextcloud entfernt.</string>
+    <string name="selected_count">Ausgewählt: %1$d</string>
+    <string name="select_all">Alle auswählen</string>
+    <string name="share_image_title">Bild teilen</string>
+    <string name="share_images_title">Bilder teilen</string>
 </resources>

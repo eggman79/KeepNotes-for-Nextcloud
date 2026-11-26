@@ -133,4 +133,21 @@
     <string name="settings_section_about">О приложении</string>
     <string name="settings_app_version">Версия %1$s</string>
     <string name="settings_server_url">Подключённый сервер</string>
+
+    <!-- Attachments & Image actions -->
+    <string name="action_save_image">Сохранить в галерею</string>
+    <string name="action_share_image">Поделиться</string>
+    <string name="action_delete_image">Удалить изображение</string>
+    <string name="action_manage_attachments">Изображения в заметке (%1$d)</string>
+    <string name="image_saved_to_gallery">Изображение сохранено</string>
+    <string name="images_saved_to_gallery">%1$d изображений сохранено</string>
+    <string name="image_save_failed">Не удалось сохранить изображение</string>
+    <string name="delete_image_title">Удалить изображение?</string>
+    <string name="delete_image_message">Это изображение будет удалено из заметки и Nextcloud.</string>
+    <string name="delete_images_title">Удалить изображения?</string>
+    <string name="delete_images_message">Выбранные изображения будут удалены из заметки и Nextcloud.</string>
+    <string name="selected_count">Выбрано: %1$d</string>
+    <string name="select_all">Выбрать все</string>
+    <string name="share_image_title">Поделиться изображением</string>
+    <string name="share_images_title">Поделиться изображениями</string>
 </resources>

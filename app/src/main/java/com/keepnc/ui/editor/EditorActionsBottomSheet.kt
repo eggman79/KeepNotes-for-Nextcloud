@@ -23,6 +23,7 @@ class EditorActionsBottomSheet : BottomSheetDialogFragment() {
     private val binding get() = _binding!!
 
     var onAddImagesClickListener: (() -> Unit)? = null
+    var onManageAttachmentsClickListener: (() -> Unit)? = null
     var onToggleCheckboxesListener: (() -> Unit)? = null
     var onCategoryClickListener: (() -> Unit)? = null
     var onDeleteClickListener: (() -> Unit)? = null
@@ -40,6 +41,7 @@ class EditorActionsBottomSheet : BottomSheetDialogFragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val hasCheckboxes = arguments?.getBoolean(ARG_HAS_CHECKBOXES) ?: false
+        val attachmentCount = arguments?.getInt(ARG_ATTACHMENT_COUNT) ?: 0
 
         binding.tvToggleCheckboxes.text = getString(
             if (hasCheckboxes) R.string.editor_action_hide_checkboxes
@@ -49,6 +51,17 @@ class EditorActionsBottomSheet : BottomSheetDialogFragment() {
         binding.actionAddImages.setOnClickListener {
             dismiss()
             onAddImagesClickListener?.invoke()
+        }
+
+        if (attachmentCount > 0) {
+            binding.actionManageAttachments.visibility = View.VISIBLE
+            binding.tvManageAttachments.text = getString(R.string.action_manage_attachments, attachmentCount)
+            binding.actionManageAttachments.setOnClickListener {
+                dismiss()
+                onManageAttachmentsClickListener?.invoke()
+            }
+        } else {
+            binding.actionManageAttachments.visibility = View.GONE
         }
 
         binding.actionToggleCheckboxes.setOnClickListener {
@@ -75,10 +88,14 @@ class EditorActionsBottomSheet : BottomSheetDialogFragment() {
     companion object {
         const val TAG = "EditorActionsBottomSheet"
         private const val ARG_HAS_CHECKBOXES = "has_checkboxes"
+        private const val ARG_ATTACHMENT_COUNT = "attachment_count"
 
-        fun newInstance(hasCheckboxes: Boolean): EditorActionsBottomSheet {
+        fun newInstance(hasCheckboxes: Boolean, attachmentCount: Int = 0): EditorActionsBottomSheet {
             return EditorActionsBottomSheet().apply {
-                arguments = bundleOf(ARG_HAS_CHECKBOXES to hasCheckboxes)
+                arguments = bundleOf(
+                    ARG_HAS_CHECKBOXES to hasCheckboxes,
+                    ARG_ATTACHMENT_COUNT to attachmentCount
+                )
             }
         }
     }

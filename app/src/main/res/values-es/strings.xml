@@ -133,4 +133,21 @@
     <string name="settings_section_about">Acerca de</string>
     <string name="settings_app_version">Versión %1$s</string>
     <string name="settings_server_url">Servidor conectado</string>
+
+    <!-- Attachments & Image actions -->
+    <string name="action_save_image">Guardar en galería</string>
+    <string name="action_share_image">Compartir</string>
+    <string name="action_delete_image">Eliminar imagen</string>
+    <string name="action_manage_attachments">Imágenes en nota (%1$d)</string>
+    <string name="image_saved_to_gallery">Imagen guardada en Fotos</string>
+    <string name="images_saved_to_gallery">%1$d imágenes guardadas en Fotos</string>
+    <string name="image_save_failed">Error al guardar la imagen</string>
+    <string name="delete_image_title">¿Eliminar imagen?</string>
+    <string name="delete_image_message">Esta imagen se eliminará de la nota y de Nextcloud.</string>
+    <string name="delete_images_title">¿Eliminar imágenes?</string>
+    <string name="delete_images_message">Las imágenes seleccionadas se eliminarán de la nota y de Nextcloud.</string>
+    <string name="selected_count">Seleccionadas: %1$d</string>
+    <string name="select_all">Seleccionar todo</string>
+    <string name="share_image_title">Compartir imagen</string>
+    <string name="share_images_title">Compartir imágenes</string>
 </resources>

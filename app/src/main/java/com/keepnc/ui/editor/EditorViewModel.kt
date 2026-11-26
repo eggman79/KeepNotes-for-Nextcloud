@@ -285,6 +285,51 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
+     * Deletes one or more image attachments from the note:
+     * 1. Removes image markdown tags from note content.
+     * 2. Calls Nextcloud DELETE endpoint if the note has a serverId.
+     * 3. Removes from stagedAttachments if present.
+     * 4. Updates content and persists changes to Room.
+     */
+    fun deleteAttachments(
+        paths: List<String>,
+        onComplete: ((newContent: String) -> Unit)? = null
+    ) {
+        if (paths.isEmpty()) return
+
+        val currentContent = content.value
+        val newContent = AttachmentUrlUtils.removeImagesFromContent(currentContent, paths.toSet())
+        content.value = newContent
+
+        val sId = serverId
+        stagedAttachments.removeAll(paths.toSet())
+
+        viewModelScope.launch {
+            if (sId != null) {
+                paths.forEach { path ->
+                    try {
+                        repository.deleteAttachment(sId, path)
+                    } catch (e: Exception) {
+                        // Ignore individual deletion errors
+                    }
+                }
+            }
+            val currentId = noteId
+            if (currentId != null) {
+                repository.updateNote(
+                    currentId,
+                    title.value,
+                    newContent,
+                    category.value,
+                    isFavorite.value
+                )
+                initialContent = newContent
+            }
+            onComplete?.invoke(newContent)
+        }
+    }
+
+    /**
      * Automatically saves current changes to local Room database and triggers server sync,
      * without navigating away from the editor screen.
      */

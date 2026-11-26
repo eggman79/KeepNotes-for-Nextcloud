@@ -347,6 +347,34 @@ class EditorViewModelTest {
         assertEquals(0, viewModel.stagedAttachments.size)
     }
 
+    @Test
+    fun `deleteAttachments removes markdown from content and calls deleteAttachment on server`() = runTest {
+        val note = NoteEntity(
+            id = 14L,
+            serverId = 104L,
+            title = "Test Note",
+            content = "Hello\n\n![pic1](.attachments.104/pic1.jpg)\n\n![pic2](.attachments.104/pic2.jpg)\n\nBye",
+            category = "",
+            favorite = false,
+            modified = 1000L
+        )
+        fakeDao.notes[14L] = note
+        viewModel.loadNote(14L)
+        advanceUntilIdle()
+
+        var callbackContent: String? = null
+        viewModel.deleteAttachments(listOf(".attachments.104/pic1.jpg")) { newContent ->
+            callbackContent = newContent
+        }
+        advanceUntilIdle()
+
+        assertEquals("Hello\n\n![pic2](.attachments.104/pic2.jpg)\n\nBye", viewModel.content.value)
+        assertEquals(viewModel.content.value, callbackContent)
+        assertEquals(1, fakeApi.deletedAttachments.size)
+        assertEquals(104L to ".attachments.104/pic1.jpg", fakeApi.deletedAttachments[0])
+        assertEquals(viewModel.content.value, fakeDao.notes[14L]?.content)
+    }
+
     private class FakeDraftStorage : DraftStorage(null) {
         val drafts = mutableMapOf<String, NoteDraft>()
 
